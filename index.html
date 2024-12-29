@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File and Job Description Uploader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            width: 80%;
+            margin: 50px auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .left-side {
+            flex: 1;
+            margin-right: 20px;
+        }
+
+        .right-side {
+            flex: 1;
+        }
+
+        .box {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .box h2 {
+            color: #333;
+        }
+
+        .file-info {
+            margin-top: 10px;
+            color: #555;
+        }
+
+        .file-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .replace-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-top: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .replace-button:hover {
+            background-color: #218838;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-list {
+            margin-top: 20px;
+        }
+
+        .file-list ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .file-list li {
+            margin-bottom: 5px;
+        }
+
+        .file-list button {
+            margin-left: 10px;
+            cursor: pointer;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        .file-list button:hover {
+            background-color: #d32f2f;
+        }
+
+        .drag-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .drag-area:hover {
+            background-color: #f0f0f0;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            height: 150px;
+            resize: vertical;
+        }
+
+        /* Center the submit button below the Resume and Job Description Boxes */
+        .submit-container {
+            width: 100%;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        /* Diff container styling */
+        .diff-container {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .diff-container span {
+            display: block;
+            padding: 5px;
+            margin-bottom: 4px;
+        }
+
+        .diff-container span.added {
+            background-color: #e6ffed;
+            color: green;
+        }
+
+        .diff-container span.deleted {
+            background-color: #ffcccc;
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Left side with Resume and Code Snippets -->
+    <div class="left-side">
+        <!-- Resume Box -->
+        <div class="box" id="resume-box">
+            <h2>Resume</h2>
+            <button onclick="document.getElementById('resume-input').click()">Choose File</button>
+            <input type="file" id="resume-input" accept=".pdf,.docx,.txt" onchange="handleFileSelect('resume')">
+            <div class="drag-area" id="resume-drag-area" ondrop="handleDrop(event, 'resume')" ondragover="allowDrop(event)">
+                <p>Drag and drop resume here</p>
+            </div>
+            <div class="file-info" id="resume-info"></div>
+        </div>
+
+        <!-- Code Snippet Box (Drag-and-Drop) -->
+        <div class="box" id="code-box">
+            <h2>Other Attachments</h2>
+            <button onclick="document.getElementById('code-input').click()">Choose Files</button>
+            <input type="file" id="code-input" accept=".js,.py,.cpp,.txt" multiple onchange="handleMultipleFilesSelect()">
+            <div class="drag-area" id="code-drag-area" ondrop="handleDrop(event, 'code')" ondragover="allowDrop(event)">
+                <p>Drag and drop code files here</p>
+            </div>
+            <div class="file-info" id="code-info"></div>
+        </div>
+    </div>
+
+    <!-- Right side with Job Description -->
+    <div class="right-side">
+        <!-- Job Description Box -->
+        <div class="box" id="job-description-box">
+            <h2>Paste the Job Description</h2>
+            <textarea id="job-description" placeholder="Paste your job description here..."></textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Submit Button centered below the boxes -->
+<div class="submit-container">
+    <button onclick="submitFiles()" class="replace-button">Submit</button>
+</div>
+
+<!-- Diff display container -->
+<div id="pdf-diff" class="diff-container"></div>
+
+<!-- Selected Files List -->
+<div class="file-list">
+    <h3>Uploaded Files:</h3>
+    <ul id="file-list"></ul>
+</div>
+
+<script>
+    let files = {
+        resume: null,
+        code: []
+    };
+    let jobDescription = "";
+
+    // Handle file selection (for resume and code)
+    function handleFileSelect(type) {
+        const input = document.getElementById(`${type}-input`);
+        const fileInfoDiv = document.getElementById(`${type}-info`);
+        const file = input.files[0];
+
+        if (file) {
+            files[type] = file;
+            const fileName = file.name;
+            fileInfoDiv.innerHTML = `File: <span class="file-name">${fileName}</span> <button class="replace-button" onclick="replaceFile('${type}')">Replace</button>`;
+            updateFileList();
+        }
+    }
+
+    // Handle multiple file selection for code snippets
+    function handleMultipleFilesSelect() {
+        const input = document.getElementById('code-input');
+        const fileInfoDiv = document.getElementById('code-info');
+        const fileList = input.files;
+        files.code = Array.from(fileList); // Convert FileList to Array
+
+        fileInfoDiv.innerHTML = `${fileList.length} file(s) selected.`;
+        updateFileList();
+    }
+
+    // Allow drop on drag-and-drop areas
+    function allowDrop(event) {
+        event.preventDefault();
+    }
+
+    // Handle drag-and-drop event
+    function handleDrop(event, type) {
+        event.preventDefault();
+        const data = event.dataTransfer.files;
+
+        if (data.length > 0) {
+            if (type === 'resume') {
+                files.resume = data[0];
+                const fileName = files.resume.name;
+                document.getElementById('resume-info').innerHTML = `File: <span class="file-name">${fileName}</span> <button class="replace-button" onclick="replaceFile('resume')">Replace</button>`;
+            } else if (type === 'code') {
+                for (let i = 0; i < data.length; i++) {
+                    files.code.push(data[i]);
+                }
+            }
+            updateFileList();
+        }
+    }
+
+    // Update the list of uploaded files
+    function updateFileList() {
+        const fileListDiv = document.getElementById("file-list");
+        fileListDiv.innerHTML = '';
+
+        // Display resume file
+        if (files.resume) {
+            const li = document.createElement('li');
+            li.textContent = `Resume: ${files.resume.name}`;
+            fileListDiv.appendChild(li);
+        }
+
+        // Display code snippet files
+        if (files.code.length > 0) {
+            files.code.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.textContent = `Code Snippet: ${file.name}`;
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Remove';
+                deleteButton.onclick = () => removeCodeSnippet(index);
+                li.appendChild(deleteButton);
+                fileListDiv.appendChild(li);
+            });
+        }
+    }
+
+    // Replace file functionality
+    function replaceFile(type) {
+        const input = document.getElementById(`${type}-input`);
+        input.click(); // Trigger file selection again
+    }
+
+    // Remove code snippet from list
+    function removeCodeSnippet(index) {
+        files.code.splice(index, 1); // Remove the file from the array
+        updateFileList(); // Update the file list display
+    }
+
+    // Capture job description input
+    document.getElementById("job-description").addEventListener("input", function(event) {
+        jobDescription = event.target.value;
+    });
+
+    // Submit files and job description to backend
+    function submitFiles() {
+        if ((files.resume || files.code.length > 0) && jobDescription) {
+            const formData = new FormData();
+            if (files.resume) formData.append('resume', files.resume);
+            files.code.forEach((file) => formData.append('additional_files', file));
+            formData.append('job_description', jobDescription);
+
+            // Example: Replace with your backend URL
+            fetch('http://127.0.0.1:8000/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            // Check if the response is successful
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();  // Parse JSON response
+        })
+        .then(data => {
+            if (data && data.diff) {
+                // If `diff` is available in the response, display it
+                localStorage.setItem("diff", data.diff);
+                localStorage.setItem("llm_suggestions", data.llm_suggestions);
+                window.location.href = "results.html";
+                //document.getElementById('pdf-diff').innerHTML = diff
+                //document.getElementById('pdf-diff').innerHTML = data.diff;
+            } else {
+                // Handle the case when `diff` is not available
+                console.error('Diff data is not available in the response');
+                document.getElementById('pdf-diff').textContent = 'No diff data available.';
+            }
+        })
+        .catch(error => {
+            // Handle any error that occurs during fetch or parsing
+            console.error('Error fetching or parsing data:', error);
+            document.getElementById('pdf-diff').textContent = 'Error fetching diff data.';
+        });
+
+        } else {
+            alert('Please upload both resume and code snippet(s), and provide a job description.');
+        }
+    }
+</script>
+
+</body>
+</html>
